@@ -15,23 +15,23 @@ python sample_json.py --input data/multi_counterfact.json \
                       --output data/preprocessing/normal/mcf_sampled_20.json --size 20
 
 # [memit]    2. 20개를 MEMIT으로 한 번에 편집 → edited_models/edited_1_20_1/
-python -u -m falcon.tester --mode edit --identical_nums 1 --num_edits_list 20
+python -u -m falcon.tester --mode edit --num_edits_list 20
 
 # [mergekit] 3. 편집 모델 + 원본 모델 병합 → merged/edited1201_gpt2xl_ties_l1.6_d0.5/
-python merge_runner.py --model_dirs edited_1_20_1 gpt2-xl \
+python merge_runner.py --edited_models edited_1_20_1 \
                        --merge_methods ties --lambdas 1.6 --densities 0.5
 
 # [memit]    4. MEMIT baseline + 병합 모델 평가 → logs/hclt/2_10/
-python -u -m falcon.tester --mode merge_test --identical_nums 1 --num_edits_list 20 --test_type all
+python -u -m falcon.tester --mode merge_test --num_edits_list 20
 
 # [memit]    5. 결과 분석
-python summary_result.py --logs_dir ./logs/hclt/2_10 --version e2o
+python summary_result.py --logs_dir ./logs/hclt/2_10
 ```
 
 ## 지원하는 병합 방법
 
-`task_arithmetic`, `ties`, `dare_ties`, `dare_linear`, `breadcrumbs`, `breadcrumbs_ties`, `della`, `della_linear`, `sce`
-(방법별 하이퍼파라미터는 루트 README의 "3. 모델 병합" 참고)
+`task_arithmetic`, `ties`, `dare_ties`, `dare_linear`
+(방법별 하이퍼파라미터는 루트 README의 "3. 원본 모델과 병합" 참고)
 
 ## 원본 MEMIT
 

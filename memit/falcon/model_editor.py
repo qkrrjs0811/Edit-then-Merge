@@ -7,32 +7,25 @@ from .falcon_util import *
 from util.globals import *
 from util import nethook
 
-from rome import ROMEHyperParams, apply_rome_to_model
 from memit import MEMITHyperParams, apply_memit_to_model
 
 from experiments.py.eval_utils_counterfact import compute_rewrite_quality_counterfact, test_batch_prediction, test_generation
-from experiments.py.eval_utils_zsre import compute_rewrite_quality_zsre
 
 from pathlib import Path
 
 from dsets import (
     AttributeSnippets,
-    CounterFactDataset,
-    MENDQADataset,
     MultiCounterFactDataset,
     get_tfidf_vectorizer
 )
 
 ALG_DICT = {
-    'ROME': (ROMEHyperParams, apply_rome_to_model),
     'MEMIT': (MEMITHyperParams, apply_memit_to_model)
 }
 
 
 DS_DICT = {
     'mcf': (MultiCounterFactDataset, compute_rewrite_quality_counterfact),
-    'cf': (CounterFactDataset, compute_rewrite_quality_counterfact),
-    'zsre': (MENDQADataset, compute_rewrite_quality_zsre),
 }
 
 
@@ -70,8 +63,7 @@ class ModelEditor:
                  output_hidden_states=False,
                  hparams_mod=None,
                  identical_num=1,
-                 merged_model_path=None,
-                 pruning=False
+                 merged_model_path=None
                 ):
         self._alg_name = alg_name
         self._model_name = model_name
@@ -88,7 +80,6 @@ class ModelEditor:
         self._output_hidden_states = output_hidden_states
         self._identical_num = identical_num
         self._merged_model_path = merged_model_path
-        self._pruning = pruning
         self._params_class, self._apply_algo = ALG_DICT[alg_name]
         self._print_init()
 
@@ -413,24 +404,13 @@ class ModelEditor:
             print(f'# ModelEditor.restore_weights() weights restored\n')
 
 
-    def edit_ext_datas(self, datas, do_org_test=True, do_edit=True, do_edit_test=True, do_extend_test=True, do_restore=False, do_restore_test=False, do_print=True, do_save=False, log_org=False, log_independent=False, log_merged=False, log_memit=False):
+    def edit_ext_datas(self, datas, do_org_test=True, do_edit=True, do_edit_test=True, do_extend_test=True, do_restore=False, do_restore_test=False, do_print=True, do_save=False, log_org=False, log_merged=False, log_memit=False):
         self._load_data()
         self._ds = datas
-        self.edit(do_org_test, do_edit, do_edit_test, do_extend_test, do_restore, do_restore_test, do_print, do_save, log_org, log_independent, log_merged, log_memit)
+        self.edit(do_org_test, do_edit, do_edit_test, do_extend_test, do_restore, do_restore_test, do_print, do_save, log_org, log_merged, log_memit)
 
 
-    def edit(self, do_org_test=True, do_edit=True, do_edit_test=True, do_extend_test=True, do_restore=False, do_restore_test=False, do_print=True, do_save=False, log_org=False, log_independent=False, log_merged=False, log_memit=False):
-        if self._num_edits > 1:
-            assert self._ds_name != 'cf', f'{self._ds_name} does not support multiple edits'
-        
-        
-        # ##### flag 출력 #####
-        # print(f'\n# ModelEditor.edit() args')
-        # print(f'\tdo_org_test : {do_org_test}, do_edit : {do_edit}, do_edit_test : {do_edit_test}, do_extend_test : {do_extend_test}')
-        # print(f'\tdo_restore : {do_restore}, do_restore_test : {do_restore_test}, do_print : {do_print}\n')
-        # print(f'\tdo_save : {do_save}\n')
-
-
+    def edit(self, do_org_test=True, do_edit=True, do_edit_test=True, do_extend_test=True, do_restore=False, do_restore_test=False, do_print=True, do_save=False, log_org=False, log_merged=False, log_memit=False):
         # 누적 실험을 위한 리스트
         case_ids_ext, record_chunks_list = [], []
 
@@ -443,15 +423,8 @@ class ModelEditor:
             if log_org:
                 self.log_file = open(log_dir / f'origin_{self._identical_num}_{self._num_edits}_{idx}.txt', 'w')
                 
-            elif log_independent:
-                self.log_file = open(log_dir / f'edited_{self._identical_num}_{self._num_edits}_{idx}.txt', 'w')
-                
-            elif log_merged==True and self._pruning==False:
+            elif log_merged:
                 self.log_file = open(log_dir / f'{self._merged_model_path.name}.txt', 'w')
-                
-            elif log_merged==True and self._pruning==True:
-                log_dir = Path('./logs/hclt') / f'{self._identical_num}_{self._num_edits}'
-                self.log_file = open(log_dir / f'pruned_{self._merged_model_path.name}.txt', 'w')
                 
             elif log_memit:
                 self.log_file = open(log_dir / f'memit_{self._identical_num}_{self._num_edits}.txt', 'w')
@@ -474,8 +447,7 @@ class ModelEditor:
                 print(f'\n# ModelEditor.edit() args')
                 print(f'\tdo_org_test : {do_org_test}, do_edit : {do_edit}, do_edit_test : {do_edit_test}, do_extend_test : {do_extend_test}')
                 print(f'\tdo_restore : {do_restore}, do_restore_test : {do_restore_test}, do_print : {do_print}, do_save : {do_save}')
-                print(f'\tlog_org : {log_org}, log_independent : {log_independent}, log_merged : {log_merged}, log_memit : {log_memit}')
-                print(f'\tpruning : {self._pruning}\n')
+                print(f'\tlog_org : {log_org}, log_merged : {log_merged}, log_memit : {log_memit}\n')
                 
                 # 확인을 위해, 한 번에 편집되는 전체 case_id list 생성
                 case_ids = [record['case_id'] for record in record_chunks]
@@ -512,7 +484,7 @@ class ModelEditor:
                         save_root.mkdir(exist_ok=True)
                         save_path = save_root / f"edited_{self._identical_num}_{self._num_edits}_{idx}"
 
-                        print(f"[ModelEditor] Saving independently edited model to {save_path}")
+                        print(f"[ModelEditor] Saving edited model to {save_path}")
                         edited_model.save_pretrained(save_path)
                         self._tok.save_pretrained(save_path)
                 else:
