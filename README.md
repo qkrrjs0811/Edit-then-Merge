@@ -16,10 +16,9 @@
 Edit-then-Merge/
 ├── README.md                  # (이 문서)
 ├── memit/                     # 지식 편집 + 평가 + 분석 (memit 환경, 이 폴더에서 실행)
-│   ├── falcon/                # 연구용 편집/평가 파이프라인
-│   │   ├── tester.py          #   실행 진입점 (--mode edit | merge_test | org_test)
-│   │   ├── model_editor.py    #   ModelEditor: 편집·예측·평가·로그·모델 저장
-│   │   └── falcon_util.py     #   파일 I/O 등 유틸
+│   ├── tester.py              # 편집/평가 실행 진입점 (--mode edit | merge_test | org_test)
+│   ├── model_editor.py        # ModelEditor: 편집·예측·평가·로그·모델 저장
+│   ├── common_util.py         # 파일 I/O 등 유틸
 │   ├── merge_runner.py        # mergekit으로 편집 모델 + 원본 모델 병합 (mergekit 환경, 하이퍼파라미터 grid 탐색)
 │   ├── sample_json.py         # MultiCounterFact에서 N개 랜덤 샘플링
 │   ├── summary_result.py      # logs/hclt/* 병합 결과 집계 + 하이퍼파라미터 분석
@@ -62,7 +61,7 @@ Edit-then-Merge/
 | torch | 1.12.1 | ≥ 2.0 |
 | transformers | 4.23.1 | ≥ 4.45.2, **< 5** |
 | pydantic | 1.9.2 | 2.10.x |
-| 실행하는 코드 | `falcon/`, `sample_json.py`, `summary_result.py` … | `merge_runner.py` |
+| 실행하는 코드 | `tester.py`, `sample_json.py`, `summary_result.py` … | `merge_runner.py` |
 
 ### 1) memit 환경
 
@@ -96,7 +95,7 @@ pip install -e ./mergekit "transformers<5"
 
 아래 예시는 빠르게 테스트할 수 있도록 **지식 20개를 편집하는 실험**을 기준으로 합니다. 편집 개수를 바꾸려면 `--size`와 `--num_edits_list`의 숫자만 바꾸면 됩니다.
 
-편집·평가는 모두 `python -u -m falcon.tester --mode <모드> --num_edits_list <N ...>`로 실행합니다. `--num_edits_list`에 값을 여러 개 주면 차례대로 실행합니다(예: `--num_edits_list 20 50 100`).
+편집·평가는 모두 `python -u tester.py --mode <모드> --num_edits_list <N ...>`로 실행합니다. `--num_edits_list`에 값을 여러 개 주면 차례대로 실행합니다(예: `--num_edits_list 20 50 100`).
 
 | `--mode` | 실행 함수 | 하는 일 | 단계 |
 |---|---|---|---|
@@ -116,14 +115,14 @@ python sample_json.py --input data/multi_counterfact.json \
                       --size 20 --seed 42
 ```
 
-`falcon/tester.py`는 `data/preprocessing/normal/mcf_sampled_{N}.json`을 읽습니다.
+`tester.py`는 `data/preprocessing/normal/mcf_sampled_{N}.json`을 읽습니다.
 
 ### 2. MEMIT 편집 후 저장 (memit 환경)
 
 원본 GPT2-XL에 20개 지식을 MEMIT으로 한 번에 편집하고, 편집 모델을 `edited_models/`에 저장합니다.
 
 ```bash
-python -u -m falcon.tester --mode edit --num_edits_list 20
+python -u tester.py --mode edit --num_edits_list 20
 # → edited_models/edited_1_20_1/
 ```
 
@@ -176,7 +175,7 @@ python merge_runner.py --edited_models edited_1_20_1 \
 
 ```bash
 conda activate memit
-python -u -m falcon.tester --mode merge_test --num_edits_list 20
+python -u tester.py --mode merge_test --num_edits_list 20
 # → logs/hclt/2_10/
 ```
 

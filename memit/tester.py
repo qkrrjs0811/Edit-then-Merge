@@ -1,7 +1,7 @@
 import argparse
 
-from .falcon_util import *
-from .model_editor import *
+from common_util import *
+from model_editor import *
 
 
 SEED = 7
@@ -9,7 +9,7 @@ torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 
 # memit/ 디렉토리 (이 파일 기준 상대 경로)
-HOME_DIR = str(Path(__file__).resolve().parent.parent)
+HOME_DIR = str(Path(__file__).resolve().parent)
 
 
 def load_datas(in_file_path: str):

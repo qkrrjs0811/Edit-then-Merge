@@ -3,7 +3,7 @@ import numpy as np
 from typing import Tuple, Union, List
 from itertools import chain
 
-from .falcon_util import *
+from common_util import *
 from util.globals import *
 from util import nethook
 

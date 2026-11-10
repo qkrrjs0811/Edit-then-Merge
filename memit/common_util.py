@@ -158,12 +158,12 @@ def load_json_file(in_file_path: str, encoding=ENCODING, do_print=False):
             datas = json.load(file)
 
             if do_print:
-                print(f'# falcon_util.load_json_file() datas size : {len(datas)}, in_file_path : {in_file_path}')
+                print(f'# common_util.load_json_file() datas size : {len(datas)}, in_file_path : {in_file_path}')
 
             return datas
 
     except Exception as e:
-        logging_error("# falcon_util.load_json_file() error : ", e)
+        logging_error("# common_util.load_json_file() error : ", e)
         return None
 
     return None
