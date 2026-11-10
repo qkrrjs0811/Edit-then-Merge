@@ -10,22 +10,22 @@
 모든 명령은 이 `memit/` 디렉토리에서 실행합니다. 가상환경은 **memit**(편집·평가)과 **mergekit**(병합) 두 개가 필요합니다.
 
 ```bash
-# [memit]    1. 데이터 샘플링
+# [memit]    1. 데이터 샘플링 (20개)
 python sample_json.py --input data/multi_counterfact.json \
-                      --output data/preprocessing/normal/mcf_sampled_3000.json --size 3000
+                      --output data/preprocessing/normal/mcf_sampled_20.json --size 20
 
-# [memit]    2. 1500개씩 2 batch 독립 편집 → edited_models/edited_2_1500_{1,2}/
-python -u -m falcon.tester --mode edit --identical_nums 2 --num_edits_list 1500
+# [memit]    2. 20개를 MEMIT으로 한 번에 편집 → edited_models/edited_1_20_1/
+python -u -m falcon.tester --mode edit --identical_nums 1 --num_edits_list 20
 
-# [mergekit] 3. 병합 → merged/edited215001_edited215002_ties_l1.6_d0.5/
-python merge_runner.py --model_dirs edited_2_1500_1 edited_2_1500_2 \
+# [mergekit] 3. 편집 모델 + 원본 모델 병합 → merged/edited1201_gpt2xl_ties_l1.6_d0.5/
+python merge_runner.py --model_dirs edited_1_20_1 gpt2-xl \
                        --merge_methods ties --lambdas 1.6 --densities 0.5
 
-# [memit]    4. MEMIT baseline + 병합 모델 평가 → logs/hclt/2_1500/
-python -u -m falcon.tester --mode merge_test --identical_nums 1 --num_edits_list 3000 --test_type all
+# [memit]    4. MEMIT baseline + 병합 모델 평가 → logs/hclt/2_10/
+python -u -m falcon.tester --mode merge_test --identical_nums 1 --num_edits_list 20 --test_type all
 
 # [memit]    5. 결과 분석
-python summary_result.py --logs_dir ./logs/hclt/2_1500 --version all
+python summary_result.py --logs_dir ./logs/hclt/2_10 --version e2o
 ```
 
 ## 지원하는 병합 방법
