@@ -1,0 +1,91 @@
+# 대용량 모델 파일들 (총 188GB+)
+edited_models/
+merged/
+original_models/
+results/
+logs/
+
+# Python 캐시 파일들
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 임시 파일들
+temp/
+*.tmp
+*.temp
+merge_conf.yml
+result.png
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# 개인 설정 파일들
+*.code-workspace
+*_env.txt
+test.md
+.vscode/
+.idea/
+
+# 로그 파일들
+*.log
+*.out
+
+# 환경 변수 및 설정
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Jupyter Notebook 체크포인트
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Linux
+*~
+
+# Windows
+*.lnk
+
+# 캐시 및 데이터 파일
+data/stats/
+*.cache
+*.pkl
+*.pickle
+
+# 모델 체크포인트
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Hugging Face 캐시
+.cache/
+transformers_cache/
