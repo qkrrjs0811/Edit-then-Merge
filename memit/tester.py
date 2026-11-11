@@ -72,14 +72,6 @@ def edit_and_save(num_edits_list=(250,)):
             do_save=True  # 저장 목적
         )
 
-        # Origin Edit method 평가 수행
-        model_editor_org = get_model_editor(num_edits)
-        model_editor_org._do_eval_org_model = False
-        model_editor_org._do_eval_new_model = False
-
-        print("\n[Test] 기존 Editing 방법에 대해 평가 수행 중...")
-        model_editor_org.edit_ext_datas(datas_subject, False, True, False, True, False, False)
-
 
 def org_test(num_edits_list):
     # 편집하지 않은 원본 모델 평가
@@ -119,10 +111,10 @@ def merge_test(num_edits_list):
     merged_dir = Path(f"{home_dir}/merged")
 
     for num_edits in num_edits_list:
-        # Origin Edit method 평가 수행
+        # Origin Edit method 평가 수행 (_do_eval_new_model: results/MEMIT/run_*/에 케이스별 지표 저장)
         model_editor_org = get_model_editor(num_edits)
         model_editor_org._do_eval_org_model = False
-        model_editor_org._do_eval_new_model = False
+        model_editor_org._do_eval_new_model = True
 
         in_file_path = f'{data_dir}/normal/mcf_sampled_{num_edits}.json'
         datas_subject = load_datas(in_file_path)
@@ -179,7 +171,7 @@ def merge_test(num_edits_list):
             model_editor_merging._model = model
             model_editor_merging._tok = tok
             model_editor_merging._do_eval_org_model = False
-            model_editor_merging._do_eval_new_model = False
+            model_editor_merging._do_eval_new_model = True
 
             print("[Test] 병합된 모델에 대해 평가 수행 중...")
             model_editor_merging.edit_ext_datas(

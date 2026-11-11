@@ -431,12 +431,14 @@ class ModelEditor:
             
             # 기존에 작업한 데이터인지 확인
             if self._check_already(record_chunks):
-                self.log_file.close()  # 로그 파일 닫기
+                if self.log_file is not None:
+                    self.log_file.close()  # 로그 파일 닫기
                 continue
 
-            # 로그를 터미널과 파일에 동시에 출력
+            # 로그 파일이 있으면 출력을 로그 파일로 보내고, 없으면 터미널에 그대로 출력
             original_stdout = sys.stdout
-            sys.stdout = self.log_file
+            if self.log_file is not None:
+                sys.stdout = self.log_file
 
             try:
                 # cpu, gpu, cache 설정
@@ -507,7 +509,11 @@ class ModelEditor:
                     if do_edit:
                         model_to_use = edited_model
                     else:
-                        model_to_use = self._model  # 기존 모델 fallback
+                        model_to_use = self._model  # 기존 모델 fallback (예: 불러온 병합 모델)
+
+                        # 편집 없이 불러온 모델(병합 모델)의 전체 성능 평가
+                        if self._do_eval_new_model:
+                            self._evaluate(model_to_use, self._tok, record_chunks)
 
                     self._predict_all(model_to_use, self._tok, record_chunks, do_print=do_print, print_prefix='edited')
 
@@ -557,7 +563,8 @@ class ModelEditor:
 
             finally:
                 # 로그 파일 닫기 및 stdout 복원
-                self.log_file.close()
+                if self.log_file is not None:
+                    self.log_file.close()
                 sys.stdout = original_stdout
 
 

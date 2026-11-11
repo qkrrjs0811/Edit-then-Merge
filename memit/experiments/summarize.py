@@ -23,8 +23,8 @@ def main(
         # print(f'summarize run_dir : {run_dir}')
 
         # Skip if we're not interested
-        if runs[0] != 'all':
-            if runs is not None and all(run not in str(run_dir) for run in runs):
+        if runs is not None and runs[0] != 'all':
+            if all(run not in str(run_dir) for run in runs):
                 continue
 
         # Iterate through all case files

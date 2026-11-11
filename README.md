@@ -22,11 +22,10 @@ Edit-then-Merge/
 │   ├── merge_runner.py        # mergekit으로 편집 모델 + 원본 모델 병합 (mergekit 환경, 하이퍼파라미터 grid 탐색)
 │   ├── sample_json.py         # MultiCounterFact에서 N개 랜덤 샘플링
 │   ├── summary_result.py      # logs/hclt/* 병합 결과 집계 + 하이퍼파라미터 분석
-│   ├── all_summary.py         # run별 메트릭(Score, Efficacy …) 요약 표 출력
 │   ├── memit/                 # MEMIT 편집 알고리즘
 │   ├── rome/                  # ROME (MEMIT이 layer_stats·repr_tools를 사용)
 │   ├── dsets/                 # MultiCounterFact 데이터셋 로더
-│   ├── experiments/           # 편집 성능 평가 함수 eval_utils_counterfact.py, summarize.py
+│   ├── experiments/           # 평가 함수 py/eval_utils_counterfact.py, 지표 집계 summarize.py (Score, Efficacy …)
 │   ├── util/                  # nethook, generate 등 유틸
 │   ├── hparams/MEMIT/gpt2-xl.json  # MEMIT 하이퍼파라미터 (편집 레이어 13~17)
 │   ├── globals.yml            # 결과/데이터/통계 경로 설정
@@ -43,11 +42,12 @@ Edit-then-Merge/
 
 | 경로 | 내용 |
 |---|---|
-| `data/` | MultiCounterFact(`multi_counterfact.json`), `data/stats/` 레이어 통계(MEMIT 실행 시 자동 다운로드), `data/preprocessing/normal/mcf_sampled_{N}.json` 샘플링 데이터 |
+| `data/` | MultiCounterFact(`multi_counterfact.json`), `data/stats/` 레이어 통계(MEMIT 실행 시 자동 다운로드), `attribute_snippets.json`·`idf.npy`·`tfidf_vocab.json`(평가용, `tester.py` 첫 실행 시 자동 다운로드, 약 1GB), `data/preprocessing/normal/mcf_sampled_{N}.json` 샘플링 데이터 |
 | `original_models/gpt2-xl/` | 원본 GPT2-XL (병합 상대) |
 | `edited_models/` | 편집 모델 `edited_1_{N}_1/` |
 | `merged/` | 병합 모델 `edited1{N}1_gpt2xl_{병합방법}_l{λ}[_d{density}]/` |
 | `logs/hclt/2_{N÷2}/` | 평가 로그 (`memit_1_{N}.txt` baseline, `{병합모델명}.txt`)와 분석 결과 |
+| `results/MEMIT/run_{번호}/` | 케이스별 평가 결과 JSON (`experiments/summarize.py`의 입력). 모델 1개 평가마다 run 폴더 1개 |
 
 ---
 
@@ -70,6 +70,7 @@ conda create -n memit python=3.9 -y
 conda activate memit
 pip install torch==1.12.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
 pip install -r memit/memit_requirements.txt
+python -c "import nltk; nltk.download('punkt')"   # Fluency(n-gram entropy) 계산에 필요
 ```
 
 ### 2) mergekit 환경
@@ -100,8 +101,8 @@ pip install -e ./mergekit "transformers<5"
 | `--mode` | 실행 함수 | 하는 일 | 단계 |
 |---|---|---|---|
 | `edit` | `edit_and_save()` | MEMIT 편집 → `edited_models/`에 저장 | 2 |
-| `merge_test` (기본값) | `merge_test()` | MEMIT baseline 평가 + `merged/` 전체 모델 평가 | 4 |
-| `org_test` | `org_test()` | 편집하지 않은 원본 모델 평가 → `logs/hclt/2_{N÷2}/origin_1_{N}_1.txt` | 참고용 |
+| `merge_test` (기본값) | `merge_test()` | MEMIT baseline 평가 + `merged/` 전체 모델 평가 → 로그 + `results/MEMIT/run_*/` | 4 |
+| `org_test` | `org_test()` | 편집하지 않은 원본 모델 평가 → `logs/hclt/2_{N÷2}/origin_1_{N}_1.txt` + `results/MEMIT/run_*/` | 참고용 |
 
 ### 1. 데이터 준비 (memit 환경)
 
@@ -171,26 +172,35 @@ python merge_runner.py --edited_models edited_1_20_1 \
 1. **Baseline**: 같은 데이터 20개를 MEMIT으로 편집해 평가 → `logs/hclt/2_10/memit_1_20.txt`
 2. **병합 모델**: `merged/`의 **모든** 모델을 불러와 같은 데이터로 평가 → `logs/hclt/2_10/{병합모델명}.txt`
 
-로그가 이미 있는 모델은 건너뜁니다. 따라서 병합 모델을 추가한 뒤 다시 실행하면 새로 추가된 모델만 평가됩니다.
+모델마다 두 가지 결과가 남습니다.
+
+- **로그** (`logs/hclt/2_10/*.txt`): 편집 프롬프트 정확도 `edited (avg)`. 5단계 `summary_result.py`가 이 값을 사용합니다.
+- **케이스별 지표** (`results/MEMIT/run_{번호}/*.json`): Efficacy·Generalization·Specificity·Fluency·Consistency 계산용. 각 로그 파일의 `run_dir : results/MEMIT/run_{번호}` 줄에서 해당 모델의 run 폴더를 확인할 수 있습니다.
+
+로그가 이미 있는 모델은 건너뜁니다. 따라서 병합 모델을 추가한 뒤 다시 실행하면 새로 추가된 모델만 평가됩니다. 평가가 중간에 끊긴 모델도 로그 파일이 남아 건너뛰므로, 그 모델의 로그 파일을 지우고 다시 실행하세요.
 
 ```bash
 conda activate memit
 python -u tester.py --mode merge_test --num_edits_list 20
-# → logs/hclt/2_10/
+# → logs/hclt/2_10/, results/MEMIT/run_*/
 ```
 
 > 로그 폴더명은 `2_{N÷2}` 규칙을 따릅니다. 따라서 20개 평가 결과는 `logs/hclt/2_10/`에 저장됩니다.
+> `merged/`의 모든 모델을 평가하므로, `--num_edits_list`에 값을 여러 개 주면 다른 N으로 만든 병합 모델도 함께 평가됩니다. N별로 나눠 실행하는 것을 권장합니다.
 
 ### 5. 결과 분석 (memit 환경)
 
 ```bash
-# 병합 로그 집계 → baseline(memit_*.txt)보다 좋은 설정 추출 → 하이퍼파라미터 분석
+# 병합 로그 집계 → edited (avg)가 baseline(memit_*.txt) 이상인 설정 추출 → 하이퍼파라미터 분석
 python summary_result.py --logs_dir ./logs/hclt/2_10
 # → logs/hclt/2_10/combined_results.txt, high_performance_methods.txt, hyperparameter_analysis_result.txt
 
-# run별 메트릭 요약 (all_summary.py에 입력된 run별 수치를 표로 출력)
-python all_summary.py --detailed --analysis
+# Score, Efficacy, Generalization, Specificity, Fluency, Consistency 산출
+python -m experiments.summarize --dir_name MEMIT                      # results/MEMIT/의 모든 run
+python -m experiments.summarize --dir_name MEMIT --runs run_001,run_002  # 특정 run만
 ```
+
+`experiments/summarize.py`는 run 폴더마다 `post_score`(Score), `post_rewrite_success`(Efficacy), `post_paraphrase_success`(Generalization), `post_neighborhood_success`(Specificity), `post_ngram_entropy`(Fluency), `post_reference_score`(Consistency)를 (평균, 표준편차) 형태로 출력합니다.
 
 ### 편집 개수를 늘려 가며 탐색하기
 
@@ -198,20 +208,21 @@ python all_summary.py --detailed --analysis
 
 1. 편집 개수를 **20 → 50 → 100 → 250 → 500 → 1,000**으로 늘려 가며 1~5단계를 반복합니다.
 2. 각 단계에서 병합 방법(Task Arithmetic, TIES, DARE-TIES, DARE-Linear)과 하이퍼파라미터 조합을 grid로 탐색합니다.
-3. MEMIT보다 성능이 좋은 비율(성공률)이 기준 이상인 조합만 다음 단계로 넘깁니다. `summary_result.py`의 `hyperparameter_analysis_result.txt`가 이 성공률을 집계합니다.
+3. MEMIT 이상의 성능을 내는 비율(성공률)이 기준 이상인 조합만 다음 단계로 넘깁니다. `summary_result.py`의 `hyperparameter_analysis_result.txt`가 이 성공률을 집계합니다.
 4. 최종적으로 **TIES**를 선택해 **10,000개 편집**에서 MEMIT과 비교합니다.
 
 ---
 
 ## 📊 평가 지표
 
-| 지표 | 의미 |
-|---|---|
-| Score | Efficacy, Generalization, Specificity의 조화평균 |
-| Efficacy | 편집한 프롬프트에서 새 target을 맞히는 비율 |
-| Generalization (Paraphrase) | 바꿔 쓴 프롬프트에서도 편집이 반영되는 비율 |
-| Specificity (Neighborhood) | 편집과 무관한 이웃 지식이 보존되는 비율 |
-| Fluency / Consistency | 생성 문장의 유창성(n-gram entropy) / 일관성 |
+| 지표 | 의미 | 산출 |
+|---|---|---|
+| Score | Efficacy, Generalization, Specificity의 조화평균 | `experiments/summarize.py` |
+| Efficacy | 편집한 프롬프트에서 새 target의 확률이 기존 target보다 높은 비율 | `experiments/summarize.py` |
+| Generalization (Paraphrase) | 바꿔 쓴 프롬프트에서도 편집이 반영되는 비율 | `experiments/summarize.py` |
+| Specificity (Neighborhood) | 편집과 무관한 이웃 지식이 보존되는 비율 | `experiments/summarize.py` |
+| Fluency / Consistency | 생성 문장의 유창성(n-gram entropy) / 일관성 | `experiments/summarize.py` |
+| `edited (avg)` | 편집한 프롬프트에서 새 target을 top-1로 정확히 생성하는 비율 | 평가 로그 → `summary_result.py` |
 
 ---
 
@@ -224,11 +235,15 @@ python all_summary.py --detailed --analysis
 | 환경 | `memit_requirements.txt` 설치 / `pip install -e ./mergekit "transformers<5"` 설치 | ✅ |
 | 환경 | 하나의 환경에 mergekit 설치 (Python 3.9) | ❌ 불가능함을 확인 (mergekit은 Python 3.10 이상 필요) |
 | 1 | MultiCounterFact 다운로드 + `sample_json.py` | ✅ |
-| 3 | 소형 GPT-2로 편집 모델 + 원본 모델 병합, 병합 방법 4개 × λ 2개 grid 탐색 | ✅ |
-| 3→4 | mergekit 환경에서 만든 병합 모델을 memit 환경(transformers 4.23.1)에서 로드하고 forward 실행 | ✅ |
-| 5 | `summary_result.py`, `all_summary.py` | ✅ (형식을 맞춘 가짜 로그로 확인) |
-| 2, 4 | GPT2-XL 실제 MEMIT 편집 및 평가 | ⚠️ 미검증 (CUDA GPU 필요, `ModelEditor`가 `.cuda()`를 직접 호출) |
+| 2 | `tester.py --mode edit --num_edits_list 10 20` (N 여러 개 연속 실행) + 원본 모델 저장 | ✅ (소형 모델) |
+| 3 | 편집 모델 + 원본 모델 병합, 병합 방법 4개 × λ 2개 grid 탐색 | ✅ (소형 모델) |
+| 4 | `tester.py --mode merge_test`: baseline·병합 모델 로그 + `results/MEMIT/run_*/` 케이스별 결과 생성 | ✅ (소형 모델) |
+| 참고 | `tester.py --mode org_test` | ✅ (소형 모델) |
+| 5 | `summary_result.py`, `python -m experiments.summarize --dir_name MEMIT` | ✅ (4단계에서 생성한 로그·결과로 확인) |
+| 2, 4 | GPT2-XL 실제 MEMIT 편집 및 평가 수치 | ⚠️ 미검증 (CUDA GPU 필요) |
 
+> "소형 모델"은 GPU가 없는 환경에서 코드 경로를 확인하기 위해, GPT2-XL과 레이어 수(48층)가 같은 작은 GPT-2와 임의의 레이어 통계를 사용하고 `cuda`를 `cpu`로 바꿔 실행한 것입니다. 실행 여부만 확인했으며 성능 수치는 의미가 없습니다.
+> Windows에서는 `PYTHONUTF8=1` 환경변수를 설정해야 합니다. 설정하지 않으면 MEMIT 코드가 데이터 파일을 cp949로 읽다가 오류가 납니다.
 > `dare_ties`는 task vector의 일부를 무작위로 drop하므로 같은 설정으로 병합해도 실행할 때마다 결과가 조금씩 다릅니다.
 
 ---
